@@ -19,7 +19,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install
-        run: python -m pip install -e .
+        run: python -m pip install -e ".[dev]"
 
       - name: Compile
         run: python -m compileall src jk_client.py
@@ -29,3 +29,9 @@ jobs:
           jk --help
           jk exec --help
           jk kernels --help
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Check distributions
+        run: python -m twine check dist/*

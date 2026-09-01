@@ -94,9 +94,9 @@ check || exit $?
 
 if [[ "${UNINSTALL}" -eq 1 ]]; then
   if [[ "${INSTALLER}" == "pipx" ]]; then
-    exec pipx uninstall jupyter-kernel-client
+    exec pipx uninstall jupyter-kernel-cli
   fi
-  exec "${PYTHON_BIN}" -m pip uninstall -y jupyter-kernel-client
+  exec "${PYTHON_BIN}" -m pip uninstall -y jupyter-kernel-cli
 fi
 
 if [[ "${INSTALLER}" == "pipx" ]]; then

@@ -6,7 +6,13 @@ It is designed for scripts and AI agents that need a stable, machine-readable wa
 
 ## Install
 
-Recommended for normal CLI use:
+Recommended for normal CLI use from PyPI:
+
+```bash
+pipx install jupyter-kernel-cli
+```
+
+Install directly from GitHub:
 
 ```bash
 pipx install git+https://github.com/hruskamiro/jupyter-kernel-client.git
@@ -15,7 +21,7 @@ pipx install git+https://github.com/hruskamiro/jupyter-kernel-client.git
 Upgrade:
 
 ```bash
-pipx upgrade jupyter-kernel-client
+pipx upgrade jupyter-kernel-cli
 ```
 
 Install from a local checkout:
@@ -193,7 +199,25 @@ if response.ok:
 ```bash
 python -m pip install -e ".[dev]"
 python -m compileall src jk_client.py
-python -m pip wheel . --no-deps -w dist
+python -m build
+python -m twine check dist/*
+```
+
+Before the first PyPI upload, verify that the distribution name is still available:
+
+```bash
+./.dev-pypi-check-availability.sh
+./.dev-testpypi-check-availability.sh
+```
+
+Build and upload through the local generic helper symlinks:
+
+```bash
+./.dev-dist-clean.sh
+./.dev-build.sh
+./.dev-check-dist.sh
+./.dev-testpypi-upload.sh
+./.dev-pypi-upload.sh
 ```
 
 ## License
