@@ -169,21 +169,32 @@ python -m build
 python -m twine check dist/*
 ```
 
-Before the first PyPI upload, verify that the distribution name is still available:
+Before the first PyPI upload, verify that the distribution name is still available on both indexes:
 
 ```bash
-./.dev-pypi-check-availability.sh
-./.dev-testpypi-check-availability.sh
+python - <<'PY'
+import urllib.error
+import urllib.request
+
+for base in ["https://pypi.org", "https://test.pypi.org"]:
+    url = f"{base}/pypi/jupyter-kernel-cli/json"
+    try:
+        urllib.request.urlopen(url, timeout=15)
+    except urllib.error.HTTPError as exc:
+        print(f"{base}: available" if exc.code == 404 else f"{base}: HTTP {exc.code}")
+    else:
+        print(f"{base}: already registered")
+PY
 ```
 
-Build and upload through the local generic helper symlinks:
+Upload to TestPyPI first, then real PyPI:
 
 ```bash
-./.dev-dist-clean.sh
-./.dev-build.sh
-./.dev-check-dist.sh
-./.dev-testpypi-upload.sh
-./.dev-pypi-upload.sh
+rm -rf dist
+python -m build
+python -m twine check dist/*
+python -m twine upload --repository testpypi dist/*
+python -m twine upload --repository pypi dist/*
 ```
 
 ## License
