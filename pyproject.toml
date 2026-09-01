@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jupyter-kernel-client"
+version = "0.1.0"
+description = "Agent-friendly CLI and Python API for talking to existing Jupyter kernels."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+  { name = "Miroslav Hruska" }
+]
+dependencies = [
+  "jupyter-client>=7.0"
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Software Development",
+  "Topic :: System :: Shells",
+  "Topic :: Utilities"
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.0"
+]
+
+[project.scripts]
+jk = "jupyter_kernel_client.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

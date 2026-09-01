@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_PYTHON="python3"
+if [[ -x /home/hruskam/miniconda3/envs/py38/bin/python ]]; then
+  DEFAULT_PYTHON="/home/hruskam/miniconda3/envs/py38/bin/python"
+fi
+PYTHON_BIN="${JK_PYTHON:-${DEFAULT_PYTHON}}"
+
+export PYTHONPATH="${SCRIPT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
+exec "$PYTHON_BIN" -m jupyter_kernel_client.cli "$@"
