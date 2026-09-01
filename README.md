@@ -107,28 +107,19 @@ Start Codex with workspace sandboxing and on-request approvals:
 codex -s workspace-write -a on-request
 ```
 
-Obtain the exact connection JSON from the live kernel with `%connect_info` and
-give it to Codex. Have Codex store it in a temporary file, for example
-`/tmp/jk-kernel.json`. Do not commit the file because it contains the kernel
-authentication key.
-
-When using Spyder IDE, the
-[`spyder-copy-current`](https://github.com/hruskamiro/spyder-copy-current)
-plugin provides a convenient way to copy the current console's kernel
-connection information for this step.
+Give Codex the active kernel connection information. You can copy it from
+`%connect_info`, or use
+[`spyder-copy-current`](https://github.com/hruskamiro/spyder-copy-current) and
+press `Ctrl+Alt+K` in Spyder to copy the current console's connection
+information.
 
 Ask Codex explicitly to run `jk` outside its command sandbox. For example:
 
 ```text
-Use the exact connection file /tmp/jk-kernel.json. Run jk with an elevated
-request and ask for reusable approval of the jk executable prefix.
-```
+Connect to this exact Jupyter kernel using jk. Run jk with an elevated request
+and ask for reusable approval of the jk executable prefix.
 
-Codex should then request approval for a command such as:
-
-```bash
-/absolute/path/to/jk eval \
-  -f /tmp/jk-kernel.json --timeout 20 "1 + 1"
+<paste the kernel connection information here>
 ```
 
 Approve the permission request shown by Codex. If the interface offers a
@@ -141,7 +132,7 @@ The important pieces are:
 - use `-a on-request`, not an approval policy that prevents elevation;
 - have Codex mark the `jk` invocation as elevated;
 - approve the actual permission prompt rather than only authorizing it in chat;
-- use the exact connection file instead of selecting an arbitrary recent kernel.
+- give Codex the connection information for the intended kernel.
 
 Approving `jk` allows arbitrary code execution in the connected Jupyter
 kernel. Treat this as execution access to that live Python session, even when
