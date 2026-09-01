@@ -9,10 +9,16 @@ It is designed for scripts and AI agents that need a stable, machine-readable wa
 Recommended for normal CLI use:
 
 ```bash
-pipx install .
+pipx install git+https://github.com/hruskamiro/jupyter-kernel-client.git
 ```
 
-Upgrade after editing a local checkout:
+Upgrade:
+
+```bash
+pipx upgrade jupyter-kernel-client
+```
+
+Install from a local checkout:
 
 ```bash
 pipx install --force .
