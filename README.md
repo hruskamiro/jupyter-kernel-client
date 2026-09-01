@@ -1,14 +1,14 @@
 # jupyter-kernel-client
 
-`jk` is a small command-line tool and Python library for executing code in an existing Jupyter kernel.
+`jk` is a small command-line tool and Python library for **executing code in an existing Jupyter kernel**.
 
-It is designed for scripts and AI agents that need a stable, machine-readable way to inspect or modify a live Python session.
+It is designed for scripts and AI agents that need a **stable, machine-readable way to inspect or modify a live Python session**.
 
 ## Intended Use Case
 
-You are working in an IPython console, Spyder console, notebook kernel, or other Jupyter-backed Python session. The session already has important state loaded: imports, data frames, models, helper functions, configuration, intermediate results, and whatever else you have built up interactively.
+You are working in an IPython console, Spyder console, notebook kernel, or other Jupyter-backed Python session. **The session already has important state loaded:** imports, data frames, models, helper functions, configuration, intermediate results, and whatever else you have built up interactively.
 
-Instead of asking an AI agent to recreate that state from scratch, give it access to the existing kernel. Export or copy the kernel connection information, tell the agent to use `jk`, and let it inspect variables, run experiments, evaluate expressions, and return structured output from the same live Python process you are using.
+**Instead of asking an AI agent to recreate that state from scratch, give it access to the existing kernel.** Export or copy the kernel connection information, tell the agent to use `jk`, and let it inspect variables, run experiments, evaluate expressions, and return structured output from the same live Python process you are using.
 
 The workflow is:
 
@@ -21,7 +21,7 @@ The workflow is:
 6. The agent runs jk exec/eval/get/vars and reports what it finds.
 ```
 
-This is useful when the hard part is not writing code from a blank environment, but exploring and manipulating the state that already exists in a live session.
+This is useful when the hard part is **not writing code from a blank environment**, but **exploring and manipulating the state that already exists in a live session**.
 
 ## Install
 
@@ -89,7 +89,7 @@ The older option order is also accepted:
 jk -f /path/to/kernel.json --json eval "x + 1"
 ```
 
-Use JSON for agents:
+Use **JSON for agents**:
 
 ```bash
 jk exec -f /path/to/kernel.json --json "print('hello'); 2 + 2"
@@ -102,7 +102,7 @@ jk exec -f /path/to/kernel.json --file script.py
 printf 'sum(range(10))\n' | jk exec -f /path/to/kernel.json --stdin
 ```
 
-For a big agent-generated block, stdin is usually the cleanest interface:
+For a **big agent-generated block**, stdin is usually the cleanest interface:
 
 ```bash
 cat <<'PY' | jk exec -f /path/to/kernel.json --stdin --json
@@ -138,13 +138,13 @@ Start Codex with workspace sandboxing and on-request approvals:
 codex -s workspace-write -a on-request
 ```
 
-Give Codex the active kernel connection information. You can copy it from
+Give Codex the **active kernel connection information**. You can copy it from
 `%connect_info`, or use
 [`spyder-copy-current`](https://github.com/hruskamiro/spyder-copy-current) and
 press `Ctrl+Alt+K` in Spyder to copy the current console's connection
 information.
 
-Ask Codex explicitly to run `jk` outside its command sandbox. For example:
+Ask Codex explicitly to **run `jk` outside its command sandbox**. For example:
 
 ```text
 Connect to this exact Jupyter kernel using jk. Run jk with an elevated request
@@ -165,8 +165,8 @@ The important pieces are:
 - approve the actual permission prompt rather than only authorizing it in chat;
 - give Codex the connection information for the intended kernel.
 
-Approving `jk` allows arbitrary code execution in the connected Jupyter
-kernel. Treat this as execution access to that live Python session, even when
+**Approving `jk` allows arbitrary code execution in the connected Jupyter
+kernel.** Treat this as execution access to that live Python session, even when
 the rest of the Codex session remains workspace-sandboxed.
 
 ## JSON Contract
