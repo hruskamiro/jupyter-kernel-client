@@ -25,57 +25,34 @@ This is useful when the hard part is **not writing code from a blank environment
 
 ## Install
 
-Recommended for normal CLI use from PyPI:
+Recommended:
 
 ```bash
 pipx install jupyter-kernel-cli
 ```
 
-Install directly from GitHub:
+Other install paths:
 
 ```bash
 pipx install git+https://github.com/hruskamiro/jupyter-kernel-client.git
-```
-
-Upgrade:
-
-```bash
 pipx upgrade jupyter-kernel-cli
-```
-
-Install from a local checkout:
-
-```bash
 pipx install --force .
-```
-
-For editable development:
-
-```bash
 python -m pip install -e ".[dev]"
 ```
 
-Check the command:
+Check:
 
 ```bash
 jk --help
 ```
 
-The repo also keeps a local `./jk` wrapper so the tool can be used before installation.
-
 ## Usage
 
-List likely running kernels:
+Common commands:
 
 ```bash
 jk kernels
 jk kernels --probe
-jk kernels --json --probe
-```
-
-Execute code:
-
-```bash
 jk exec -f /path/to/kernel.json "x = 41"
 jk eval -f /path/to/kernel.json "x + 1"
 jk get -f /path/to/kernel.json x
@@ -83,29 +60,10 @@ jk vars -f /path/to/kernel.json --json
 jk demo -f /path/to/kernel.json --json
 ```
 
-The older option order is also accepted:
+Use **JSON for agents** and stdin for larger generated code:
 
 ```bash
-jk -f /path/to/kernel.json --json eval "x + 1"
-```
-
-Use **JSON for agents**:
-
-```bash
-jk exec -f /path/to/kernel.json --json "print('hello'); 2 + 2"
-```
-
-Read larger code from a file or stdin:
-
-```bash
-jk exec -f /path/to/kernel.json --file script.py
-printf 'sum(range(10))\n' | jk exec -f /path/to/kernel.json --stdin
-```
-
-For a **big agent-generated block**, stdin is usually the cleanest interface:
-
-```bash
-cat <<'PY' | jk exec -f /path/to/kernel.json --stdin --json
+cat <<'PY' | jk exec -f /path/to/kernel.json --json --stdin
 import pandas as pd
 
 summary = {
@@ -116,27 +74,26 @@ summary
 PY
 ```
 
-The JSON response carries:
-
-```text
-status/result status, stdout, stderr, all rich display outputs, final text/plain result,
-a parsed Python literal when text/plain is a literal, traceback details, elapsed time, and message id.
-```
-
-You can avoid repeating the connection file:
+Other supported forms:
 
 ```bash
+jk exec -f /path/to/kernel.json --file script.py
+jk -f /path/to/kernel.json --json eval "x + 1"
 export JK_CONNECTION_FILE=/path/to/kernel.json
 jk eval "df.shape"
 ```
 
+The JSON response includes status, stdout, stderr, rich display outputs, final `text/plain` result, parsed Python literal when possible, traceback details, elapsed time, timeout state, and message id.
+
 ## Using `jk` from Codex
 
-Start Codex with workspace sandboxing and on-request approvals:
+One working pattern is to start Codex with workspace sandboxing and on-request approvals:
 
 ```bash
 codex -s workspace-write -a on-request
 ```
+
+The exact command and permission flow may change across Codex versions, approval policies, sandbox settings, and local configuration. The important point is that Codex may need permission to run `jk` outside its command sandbox so it can open the local Jupyter kernel connection.
 
 Give Codex the **active kernel connection information**. You can copy it from
 `%connect_info`, or use
@@ -153,17 +110,7 @@ and ask for reusable approval of the jk executable prefix.
 <paste the kernel connection information here>
 ```
 
-Approve the permission request shown by Codex. If the interface offers a
-reusable command-prefix approval, scope it to the resolved `jk` executable,
-which can be found with `command -v jk`. The applicable approval scope may be
-limited to the current session or environment.
-
-The important pieces are:
-
-- use `-a on-request`, not an approval policy that prevents elevation;
-- have Codex mark the `jk` invocation as elevated;
-- approve the actual permission prompt rather than only authorizing it in chat;
-- give Codex the connection information for the intended kernel.
+Approve the permission request shown by Codex. If the interface offers reusable command-prefix approval, scope it to the resolved `jk` executable, which can be found with `command -v jk`.
 
 **Approving `jk` allows arbitrary code execution in the connected Jupyter
 kernel.** Treat this as execution access to that live Python session, even when
