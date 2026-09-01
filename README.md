@@ -99,6 +99,54 @@ export JK_CONNECTION_FILE=/path/to/kernel.json
 jk eval "df.shape"
 ```
 
+## Using `jk` from Codex
+
+Start Codex with workspace sandboxing and on-request approvals:
+
+```bash
+codex -s workspace-write -a on-request
+```
+
+Obtain the exact connection JSON from the live kernel with `%connect_info` and
+give it to Codex. Have Codex store it in a temporary file, for example
+`/tmp/jk-kernel.json`. Do not commit the file because it contains the kernel
+authentication key.
+
+When using Spyder IDE, the
+[`spyder-copy-current`](https://github.com/hruskamiro/spyder-copy-current)
+plugin provides a convenient way to copy the current console's kernel
+connection information for this step.
+
+Ask Codex explicitly to run `jk` outside its command sandbox. For example:
+
+```text
+Use the exact connection file /tmp/jk-kernel.json. Run jk with an elevated
+request and ask for reusable approval of the jk executable prefix.
+```
+
+Codex should then request approval for a command such as:
+
+```bash
+/absolute/path/to/jk eval \
+  -f /tmp/jk-kernel.json --timeout 20 "1 + 1"
+```
+
+Approve the permission request shown by Codex. If the interface offers a
+reusable command-prefix approval, scope it to the resolved `jk` executable,
+which can be found with `command -v jk`. The applicable approval scope may be
+limited to the current session or environment.
+
+The important pieces are:
+
+- use `-a on-request`, not an approval policy that prevents elevation;
+- have Codex mark the `jk` invocation as elevated;
+- approve the actual permission prompt rather than only authorizing it in chat;
+- use the exact connection file instead of selecting an arbitrary recent kernel.
+
+Approving `jk` allows arbitrary code execution in the connected Jupyter
+kernel. Treat this as execution access to that live Python session, even when
+the rest of the Codex session remains workspace-sandboxed.
+
 ## JSON Contract
 
 Successful JSON responses include:
