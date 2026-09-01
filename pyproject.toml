@@ -15,6 +15,7 @@ authors = [
 dependencies = [
   "jupyter-client>=7.0"
 ]
+keywords = ["jupyter", "kernel", "cli", "automation", "agent"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
@@ -25,6 +26,11 @@ classifiers = [
   "Topic :: System :: Shells",
   "Topic :: Utilities"
 ]
+
+[project.urls]
+Homepage = "https://github.com/hruskamiro/jupyter-kernel-client"
+Repository = "https://github.com/hruskamiro/jupyter-kernel-client"
+Issues = "https://github.com/hruskamiro/jupyter-kernel-client/issues"
 
 [project.optional-dependencies]
 dev = [
