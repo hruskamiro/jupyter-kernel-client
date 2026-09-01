@@ -12,14 +12,12 @@ You are working in an IPython console, Spyder console, notebook kernel, or other
 
 The workflow is:
 
-```text
-1. Work normally in an IPython/Jupyter-backed console.
-2. Load the data, objects, functions, and state you care about.
-3. Copy the active kernel connection info, for example with %connect_info.
-4. Give that connection info to Codex or another agent.
-5. Tell the agent to use jk to connect to that exact kernel.
-6. The agent runs jk exec/eval/get/vars and reports what it finds.
-```
+1. **Work normally** in an IPython, Spyder, notebook, or other Jupyter-backed console.
+2. **Load the state you care about:** data, objects, functions, imports, models, and intermediate results.
+3. **Copy the active kernel connection info**, for example with `%connect_info`.
+4. **Give that connection info to Codex or another agent.**
+5. **Tell the agent to use `jk`** to connect to that exact kernel.
+6. **Let the agent inspect and experiment** with `jk exec`, `jk eval`, `jk get`, and `jk vars`.
 
 This is useful when the hard part is **not writing code from a blank environment**, but **exploring and manipulating the state that already exists in a live session**.
 
