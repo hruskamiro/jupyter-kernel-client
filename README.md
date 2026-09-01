@@ -4,6 +4,25 @@
 
 It is designed for scripts and AI agents that need a stable, machine-readable way to inspect or modify a live Python session.
 
+## Intended Use Case
+
+You are working in an IPython console, Spyder console, notebook kernel, or other Jupyter-backed Python session. The session already has important state loaded: imports, data frames, models, helper functions, configuration, intermediate results, and whatever else you have built up interactively.
+
+Instead of asking an AI agent to recreate that state from scratch, give it access to the existing kernel. Export or copy the kernel connection information, tell the agent to use `jk`, and let it inspect variables, run experiments, evaluate expressions, and return structured output from the same live Python process you are using.
+
+The workflow is:
+
+```text
+1. Work normally in an IPython/Jupyter-backed console.
+2. Load the data, objects, functions, and state you care about.
+3. Copy the active kernel connection info, for example with %connect_info.
+4. Give that connection info to Codex or another agent.
+5. Tell the agent to use jk to connect to that exact kernel.
+6. The agent runs jk exec/eval/get/vars and reports what it finds.
+```
+
+This is useful when the hard part is not writing code from a blank environment, but exploring and manipulating the state that already exists in a live session.
+
 ## Install
 
 Recommended for normal CLI use from PyPI:
