@@ -85,31 +85,39 @@ The JSON response includes status, stdout, stderr, rich display outputs, final `
 
 ## Using `jk` from Codex
 
-Start Codex normally, give it the **active kernel connection information**, and ask it to use `jk` to interact with that kernel. In the common case, Codex can run `jk` directly and connect to a local kernel without any special approval step.
+Give Codex the **active kernel connection information** and tell it to use `jk`,
+the locally installed **jupyter-kernel-client CLI**, to connect to that exact
+kernel.
 
-You can copy the connection information from `%connect_info`, or use
+For Codex, the clearest instruction is usually to run `jk` **outside the command
+sandbox**. This gives `jk` direct access to the local Jupyter kernel sockets
+while the rest of the session can remain workspace-sandboxed.
+
+You can copy the connection information from `%connect_info`. For integration
+with the Spyder IDE, use
 [`spyder-copy-current`](https://github.com/hruskamiro/spyder-copy-current) and
 press `Ctrl+Alt+K` in Spyder to copy the current console's connection
-information.
+information or a complete agent-ready prompt.
 
 For example:
 
 ```text
-Connect to this exact Jupyter kernel using jk. Inspect the available variables,
-run small experiments there, and report the results.
+Connect to this exact Jupyter kernel using jk, the locally installed
+jupyter-kernel-client CLI. Run jk outside the command sandbox if approval is
+needed. Inspect the available variables, run small experiments there, and report
+the results.
 
 <paste the kernel connection information here>
 ```
 
-If there are local environment or sandbox issues, useful fallback paths are:
+Useful checks if it does not work:
 
-1. Make sure Codex is using an installed `jk` whose Python environment has `jupyter-client`.
+1. Make sure `jk` is installed and visible with `command -v jk`.
 2. Pass the connection file explicitly with `jk -f /path/to/kernel.json ...`.
-3. If the interface blocks local kernel socket access, approve the resolved `jk` executable for that command.
+3. Make sure the installed `jk` environment has `jupyter-client`.
 
 **Approving `jk` allows arbitrary code execution in the connected Jupyter
-kernel.** Treat this as execution access to that live Python session, even when
-the rest of the Codex session remains workspace-sandboxed.
+kernel.** Treat this as execution access to that live Python session.
 
 ## JSON Contract
 
