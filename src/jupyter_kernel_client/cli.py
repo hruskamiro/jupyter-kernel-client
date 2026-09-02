@@ -9,7 +9,16 @@ from typing import Iterable, List, Optional
 
 from jupyter_core.paths import jupyter_runtime_dir
 
-from .client import KernelClientError, KernelResponse, execute, eval_expression, get_variable, kernel_is_ready
+from .client import (
+    InterruptResponse,
+    KernelClientError,
+    KernelResponse,
+    execute,
+    eval_expression,
+    get_variable,
+    interrupt_kernel,
+    kernel_is_ready,
+)
 
 
 def _default_connection_file() -> Optional[str]:
@@ -87,6 +96,25 @@ def _emit_response(response: KernelResponse, *, json_output: bool) -> int:
     return _print_human(response)
 
 
+def _emit_interrupt_response(response: InterruptResponse, *, json_output: bool) -> int:
+    if json_output:
+        print(json.dumps(response.to_dict(), ensure_ascii=True))
+    elif response.status == "sent":
+        print(f"Sent interrupt request: {response.msg_id}")
+    elif response.ok:
+        print(f"Interrupted kernel: {response.msg_id}")
+    elif response.status == "timeout":
+        print(f"Timed out waiting for interrupt reply after {response.elapsed_seconds:.2f}s.", file=sys.stderr)
+    elif response.error:
+        print(f"Interrupt failed: {response.error}", file=sys.stderr)
+    else:
+        print(f"Interrupt failed with status: {response.status}", file=sys.stderr)
+
+    if response.status == "timeout":
+        return 124
+    return 0 if response.ok else 1
+
+
 def _resolve_connection_file(args: argparse.Namespace) -> str:
     connection_file = args.connection_file or _default_connection_file()
     if connection_file:
@@ -97,13 +125,13 @@ def _resolve_connection_file(args: argparse.Namespace) -> str:
     )
 
 
-def _add_common_options(parser: argparse.ArgumentParser) -> None:
+def _add_common_options(parser: argparse.ArgumentParser, *, timeout_help: str = "Seconds to wait for execution completion.") -> None:
     parser.add_argument(
         "--connection-file",
         "-f",
         help="Path to a Jupyter kernel connection JSON file. Defaults to JK_CONNECTION_FILE or JUPYTER_CONNECTION_FILE.",
     )
-    parser.add_argument("--timeout", type=float, default=30.0, help="Seconds to wait for execution completion.")
+    parser.add_argument("--timeout", type=float, default=30.0, help=timeout_help)
     parser.add_argument("--json", action="store_true", help="Emit stable structured JSON output.")
 
 
@@ -184,6 +212,10 @@ def _build_parser() -> argparse.ArgumentParser:
     demo_parser = subparsers.add_parser("demo", help="Run a short capability demo against a kernel.")
     _add_common_options(demo_parser)
 
+    interrupt_parser = subparsers.add_parser("interrupt", help="Send KeyboardInterrupt to a running kernel.")
+    _add_common_options(interrupt_parser, timeout_help="Seconds to wait for an interrupt reply.")
+    interrupt_parser.add_argument("--no-wait", action="store_true", help="Do not wait for an interrupt reply.")
+
     kernels_parser = subparsers.add_parser("kernels", help="List recent connection files in the Jupyter runtime directory.")
     kernels_parser.add_argument("--json", action="store_true", help="Emit JSON.")
     kernels_parser.add_argument("--limit", type=int, default=20, help="Maximum files to list. Use 0 for no limit.")
@@ -199,7 +231,7 @@ def _normalize_argv(argv: Optional[Iterable[str]]) -> Optional[List[str]]:
     else:
         values = list(argv)
 
-    commands = {"exec", "eval", "get", "vars", "demo", "kernels"}
+    commands = {"exec", "eval", "get", "vars", "demo", "interrupt", "kernels"}
     command_positions = [index for index, value in enumerate(values) if value in commands]
     if not command_positions:
         return values if argv is not None else None
@@ -260,6 +292,9 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
             )
         elif args.command == "demo":
             return _run_demo(connection_file, timeout=args.timeout, json_output=args.json)
+        elif args.command == "interrupt":
+            response = interrupt_kernel(connection_file, timeout=args.timeout, wait=not args.no_wait)
+            return _emit_interrupt_response(response, json_output=args.json)
         else:
             parser.error(f"Unknown command: {args.command}")
     except Exception as exc:

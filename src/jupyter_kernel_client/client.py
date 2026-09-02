@@ -75,6 +75,31 @@ class KernelResponse:
         }
 
 
+@dataclass
+class InterruptResponse:
+    status: str
+    msg_id: str
+    reply: Optional[Dict[str, Any]]
+    elapsed_seconds: float
+    timed_out: bool
+    error: Optional[str] = None
+
+    @property
+    def ok(self) -> bool:
+        return self.status in {"ok", "sent"} and not self.timed_out and self.error is None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "status": self.status,
+            "ok": self.ok,
+            "msg_id": self.msg_id,
+            "reply": self.reply,
+            "elapsed_seconds": self.elapsed_seconds,
+            "timed_out": self.timed_out,
+            "error": self.error,
+        }
+
+
 def _parse_python_literal(text: Optional[str]) -> Any:
     if text is None:
         return None
@@ -100,10 +125,78 @@ def _make_client(connection_file: str, *, ready_timeout: float = 5.0) -> Blockin
     return client
 
 
+def _make_started_client(connection_file: str) -> BlockingKernelClient:
+    path = Path(connection_file).expanduser()
+    if not path.exists():
+        raise KernelClientError(f"Connection file does not exist: {path}")
+
+    client = BlockingKernelClient(connection_file=str(path))
+    client.load_connection_file()
+    client.start_channels()
+    return client
+
+
 def kernel_is_ready(connection_file: str, *, timeout: float = 1.0) -> None:
     """Raise KernelClientError if the kernel connection file does not respond."""
     client = _make_client(connection_file, ready_timeout=timeout)
     client.stop_channels()
+
+
+def interrupt_kernel(connection_file: str, *, timeout: float = 5.0, wait: bool = True) -> InterruptResponse:
+    """Send an interrupt request to a kernel through the Jupyter control channel."""
+    if timeout <= 0:
+        raise ValueError("timeout must be greater than zero")
+
+    client = _make_started_client(connection_file)
+    started = time.monotonic()
+    msg_id = ""
+    try:
+        msg = client.session.msg("interrupt_request", {})
+        client.control_channel.send(msg)
+        msg_id = msg["header"]["msg_id"]
+
+        if not wait:
+            return InterruptResponse(
+                status="sent",
+                msg_id=msg_id,
+                reply=None,
+                elapsed_seconds=round(time.monotonic() - started, 6),
+                timed_out=False,
+            )
+
+        deadline = started + timeout
+        while time.monotonic() < deadline:
+            remaining = max(0.05, deadline - time.monotonic())
+            try:
+                reply = client.get_control_msg(timeout=remaining)
+            except Empty:
+                continue
+
+            if reply.get("parent_header", {}).get("msg_id") != msg_id:
+                continue
+
+            content = reply.get("content", {})
+            if reply.get("msg_type") == "interrupt_reply":
+                status = content.get("status") or "ok"
+                return InterruptResponse(
+                    status=status,
+                    msg_id=msg_id,
+                    reply={key: _json_safe(value) for key, value in content.items()},
+                    elapsed_seconds=round(time.monotonic() - started, 6),
+                    timed_out=False,
+                    error=None if status == "ok" else content.get("evalue") or content.get("ename"),
+                )
+
+        return InterruptResponse(
+            status="timeout",
+            msg_id=msg_id,
+            reply=None,
+            elapsed_seconds=round(time.monotonic() - started, 6),
+            timed_out=True,
+            error="Timed out waiting for interrupt_reply.",
+        )
+    finally:
+        client.stop_channels()
 
 
 def _json_safe(value: Any) -> Any:

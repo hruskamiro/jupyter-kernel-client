@@ -55,6 +55,7 @@ jk exec -f /path/to/kernel.json "x = 41"
 jk eval -f /path/to/kernel.json "x + 1"
 jk get -f /path/to/kernel.json x
 jk vars -f /path/to/kernel.json --json
+jk interrupt -f /path/to/kernel.json --json
 jk demo -f /path/to/kernel.json --json
 ```
 
@@ -79,6 +80,14 @@ jk exec -f /path/to/kernel.json --file script.py
 jk -f /path/to/kernel.json --json eval "x + 1"
 export JK_CONNECTION_FILE=/path/to/kernel.json
 jk eval "df.shape"
+```
+
+If execution times out, the code may still be running in the kernel. Send an
+interrupt request separately:
+
+```bash
+jk exec -f /path/to/kernel.json --timeout 5 --json "long_running_call()"
+jk interrupt -f /path/to/kernel.json --json
 ```
 
 The JSON response includes status, stdout, stderr, rich display outputs, final `text/plain` result, parsed Python literal when possible, traceback details, elapsed time, timeout state, and message id.
@@ -148,19 +157,26 @@ Exit codes:
 0    kernel execution succeeded
 1    kernel execution raised an error
 2    client or argument error
-124  client timed out waiting for the kernel
+124  client timed out waiting for the kernel or interrupt reply
 ```
 
-Timeouts only stop the client wait. With only a connection file, `jk` cannot reliably kill or interrupt an arbitrary kernel process, so timed-out execution may continue in the kernel.
+Timeouts only stop the client wait. Timed-out execution may continue in the
+kernel until it finishes or is interrupted. `jk interrupt` sends a Jupyter
+`interrupt_request` on the control channel; for Python kernels this is the
+normal KeyboardInterrupt-style path. It is not a process kill, so native
+extensions or blocking system calls may not stop immediately.
 
 ## Python API
 
 ```python
-from jupyter_kernel_client import execute, eval_expression, get_variable
+from jupyter_kernel_client import eval_expression, interrupt_kernel
 
 response = eval_expression("/path/to/kernel.json", "x + 1")
 if response.ok:
     print(response.result_python)
+
+interrupt = interrupt_kernel("/path/to/kernel.json")
+print(interrupt.status)
 ```
 
 ## License
