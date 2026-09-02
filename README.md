@@ -85,30 +85,27 @@ The JSON response includes status, stdout, stderr, rich display outputs, final `
 
 ## Using `jk` from Codex
 
-One working pattern is to start Codex with workspace sandboxing and on-request approvals:
+Start Codex normally, give it the **active kernel connection information**, and ask it to use `jk` to interact with that kernel. In the common case, Codex can run `jk` directly and connect to a local kernel without any special approval step.
 
-```bash
-codex -s workspace-write -a on-request
-```
-
-The exact command and permission flow may change across Codex versions, approval policies, sandbox settings, and local configuration. The important point is that Codex may need permission to run `jk` outside its command sandbox so it can open the local Jupyter kernel connection.
-
-Give Codex the **active kernel connection information**. You can copy it from
-`%connect_info`, or use
+You can copy the connection information from `%connect_info`, or use
 [`spyder-copy-current`](https://github.com/hruskamiro/spyder-copy-current) and
 press `Ctrl+Alt+K` in Spyder to copy the current console's connection
 information.
 
-Ask Codex explicitly to **run `jk` outside its command sandbox**. For example:
+For example:
 
 ```text
-Connect to this exact Jupyter kernel using jk. Run jk with an elevated request
-and ask for reusable approval of the jk executable prefix.
+Connect to this exact Jupyter kernel using jk. Inspect the available variables,
+run small experiments there, and report the results.
 
 <paste the kernel connection information here>
 ```
 
-Approve the permission request shown by Codex. If the interface offers reusable command-prefix approval, scope it to the resolved `jk` executable, which can be found with `command -v jk`.
+If there are local environment or sandbox issues, useful fallback paths are:
+
+1. Make sure Codex is using an installed `jk` whose Python environment has `jupyter-client`.
+2. Pass the connection file explicitly with `jk -f /path/to/kernel.json ...`.
+3. If the interface blocks local kernel socket access, approve the resolved `jk` executable for that command.
 
 **Approving `jk` allows arbitrary code execution in the connected Jupyter
 kernel.** Treat this as execution access to that live Python session, even when
