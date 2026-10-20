@@ -7,8 +7,6 @@ import sys
 from pathlib import Path
 from typing import Iterable, List, Optional
 
-from jupyter_core.paths import jupyter_runtime_dir
-
 from .client import (
     InterruptResponse,
     KernelClientError,
@@ -17,42 +15,13 @@ from .client import (
     eval_expression,
     get_variable,
     interrupt_kernel,
-    kernel_is_ready,
 )
 from .skill import SkillInstallError, codex_skill_path, install_codex_skill
+from .kernels import discover_kernels, start_kernel, stop_kernel
 
 
 def _default_connection_file() -> Optional[str]:
     return os.environ.get("JK_CONNECTION_FILE") or os.environ.get("JUPYTER_CONNECTION_FILE")
-
-
-def _runtime_connection_files(limit: Optional[int] = None) -> List[Path]:
-    runtime = Path(jupyter_runtime_dir()).expanduser()
-    if not runtime.exists():
-        return []
-    files = sorted(runtime.glob("kernel-*.json"), key=lambda path: path.stat().st_mtime, reverse=True)
-    if limit is not None:
-        return files[:limit]
-    return files
-
-
-def _kernel_record(path: Path, *, probe: bool, timeout: float) -> dict:
-    record = {
-        "path": str(path),
-        "modified": path.stat().st_mtime,
-        "alive": None,
-        "error": None,
-    }
-    if not probe:
-        return record
-
-    try:
-        kernel_is_ready(str(path), timeout=timeout)
-        record["alive"] = True
-    except Exception as exc:
-        record["alive"] = False
-        record["error"] = str(exc)
-    return record
 
 
 def _read_code(args: argparse.Namespace) -> str:
@@ -186,7 +155,7 @@ def _run_demo(connection_file: str, *, timeout: float, json_output: bool) -> int
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="jk", description="Execute code in an existing Jupyter kernel.")
+    parser = argparse.ArgumentParser(prog="jk", description="Start, discover, and work with Jupyter kernels.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     exec_parser = subparsers.add_parser("exec", help="Execute code.")
@@ -217,9 +186,23 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_common_options(interrupt_parser, timeout_help="Seconds to wait for an interrupt reply.")
     interrupt_parser.add_argument("--no-wait", action="store_true", help="Do not wait for an interrupt reply.")
 
-    kernels_parser = subparsers.add_parser("kernels", help="List recent connection files in the Jupyter runtime directory.")
+    kernel_parser = subparsers.add_parser("kernel", help="Explicit kernel lifecycle operations.")
+    kernel_commands = kernel_parser.add_subparsers(dest="kernel_command", required=True)
+    start_parser = kernel_commands.add_parser("start", help="Start a detached Python kernel and wait for readiness.")
+    start_parser.add_argument("--python", help="Python executable containing ipykernel (default: jk's Python).")
+    start_parser.add_argument("--connection-file", "-f", help="New connection path (default: unique runtime-directory file).")
+    start_parser.add_argument("--cwd", help="Kernel working directory (default: current directory).")
+    start_parser.add_argument("--log", help="New log path (default: connection path with .log suffix).")
+    start_parser.add_argument("--timeout", type=float, default=30.0, help="Startup readiness timeout in seconds.")
+    start_parser.add_argument("--json", action="store_true", help="Emit JSON with PID, connection path and log path.")
+    stop_parser = kernel_commands.add_parser("stop", help="Request graceful shutdown; never force-kill.")
+    stop_parser.add_argument("--connection-file", "-f", required=True, help="Explicit connection file of the kernel to stop.")
+    stop_parser.add_argument("--timeout", type=float, default=10.0, help="Seconds to wait for shutdown confirmation.")
+    stop_parser.add_argument("--json", action="store_true", help="Emit shutdown acknowledgement and process-exit status.")
+
+    kernels_parser = subparsers.add_parser("kernels", help="Discover current-user local kernels from runtime files and processes.")
     kernels_parser.add_argument("--json", action="store_true", help="Emit JSON.")
-    kernels_parser.add_argument("--limit", type=int, default=20, help="Maximum files to list. Use 0 for no limit.")
+    kernels_parser.add_argument("--limit", type=int, default=20, help="Maximum records to list, live processes first. Use 0 for no limit.")
     kernels_parser.add_argument("--probe", action="store_true", help="Connect to each listed file and report whether it responds.")
     kernels_parser.add_argument("--timeout", type=float, default=1.0, help="Seconds to wait per probed kernel.")
 
@@ -258,7 +241,7 @@ def _normalize_argv(argv: Optional[Iterable[str]]) -> Optional[List[str]]:
     else:
         values = list(argv)
 
-    commands = {"exec", "eval", "get", "vars", "demo", "interrupt", "kernels", "skill"}
+    commands = {"exec", "eval", "get", "vars", "demo", "interrupt", "kernels", "kernel", "skill"}
     command_positions = [index for index, value in enumerate(values) if value in commands]
     if not command_positions:
         return values if argv is not None else None
@@ -272,20 +255,19 @@ def _normalize_argv(argv: Optional[Iterable[str]]) -> Optional[List[str]]:
 
 
 def _list_kernels(*, json_output: bool, limit: int, probe: bool, timeout: float) -> int:
-    files = _runtime_connection_files(limit=None if limit == 0 else limit)
-    records = [_kernel_record(path, probe=probe, timeout=timeout) for path in files]
+    records = discover_kernels(limit=limit, probe=probe, timeout=timeout)
     if json_output:
         print(json.dumps(records, ensure_ascii=True))
         return 0
     if not records:
-        print("No kernel connection files found.")
+        print("No kernel candidates found.")
         return 1
     for record in records:
-        if probe:
-            status = "alive" if record["alive"] else "dead"
-            print(f"{status:5} {record['path']}")
-        else:
-            print(record["path"])
+        status = "running" if record["running"] else "file-only"
+        if probe and record["responsive"] is not None:
+            status += "/responsive" if record["responsive"] else "/unresponsive"
+        pids = ",".join(str(process["pid"]) for process in record["processes"]) or "-"
+        print(f"{status:24} pid={pids:10} {record['path'] or '(connection path unknown)'}")
     return 0
 
 
@@ -296,6 +278,26 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     try:
         if args.command == "kernels":
             return _list_kernels(json_output=args.json, limit=args.limit, probe=args.probe, timeout=args.timeout)
+        if args.command == "kernel" and args.kernel_command == "start":
+            record = start_kernel(python=args.python, connection_file=args.connection_file,
+                                  cwd=args.cwd, log=args.log, timeout=args.timeout)
+            if args.json:
+                print(json.dumps(record, ensure_ascii=True))
+            else:
+                print(f"Started kernel PID {record['pid']}\nConnection: {record['path']}\nLog: {record['log']}")
+            return 0
+        if args.command == "kernel" and args.kernel_command == "stop":
+            record = stop_kernel(args.connection_file, timeout=args.timeout)
+            if args.json:
+                print(json.dumps(record, ensure_ascii=True))
+            elif record["status"] == "stopped":
+                print(f"Stopped kernel PID {record['pid']}: {record['path']}")
+            elif record["ok"]:
+                print(f"Shutdown acknowledged; process exit not verified: {record['path']}")
+            else:
+                print(f"Shutdown not confirmed within {args.timeout:g}s; the request may still complete: {record['path']}",
+                      file=sys.stderr)
+            return 0 if record["ok"] else 124
         if args.command == "skill":
             if args.skill_command == "path":
                 print(codex_skill_path(destination=args.dest))

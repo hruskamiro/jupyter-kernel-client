@@ -11,6 +11,7 @@ from .client import (
     interrupt_kernel,
     kernel_is_ready,
 )
+from .kernels import discover_kernels, start_kernel, stop_kernel
 
 __all__ = [
     "InterruptResponse",
@@ -22,4 +23,7 @@ __all__ = [
     "get_variable",
     "interrupt_kernel",
     "kernel_is_ready",
+    "discover_kernels",
+    "start_kernel",
+    "stop_kernel",
 ]

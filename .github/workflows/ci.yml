@@ -29,6 +29,8 @@ jobs:
           jk --help
           jk exec --help
           jk kernels --help
+          jk kernel start --help
+          jk kernel stop --help
           jk skill --help
 
       - name: Build distributions

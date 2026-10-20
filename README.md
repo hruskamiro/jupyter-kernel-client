@@ -1,15 +1,18 @@
 # jupyter-kernel-client
 
-`jk` is a small command-line tool and Python library for **executing code in an existing Jupyter kernel**.
+`jk` is a command-line tool and Python library for **discovering, starting, using,
+and gracefully stopping Jupyter kernels**. It works with existing Jupyter,
+IPython, and Spyder sessions as well as detached kernels it starts itself.
 
 It is designed for scripts and AI agents that need a **stable, machine-readable way to inspect or modify a live Python session**.
 
 ## Quick Start With Codex
 
-Install the CLI and its user-level Codex skill:
+This README describes the unreleased **`0.2.0.dev0` development version**.
+Install it from GitHub, then install its user-level Codex skill:
 
 ```bash
-pipx install jupyter-kernel-cli
+pipx install git+https://github.com/hruskamiro/jupyter-kernel-client.git@main
 jk skill install
 ```
 
@@ -45,17 +48,20 @@ This is useful when the hard part is **not writing code from a blank environment
 
 ## Install
 
-Recommended:
+For the development features documented here, install GitHub `main`:
 
 ```bash
-pipx install jupyter-kernel-cli
+pipx install git+https://github.com/hruskamiro/jupyter-kernel-client.git@main
 ```
 
-Other install paths:
+Published releases are available through `pipx install jupyter-kernel-cli`, but
+the PyPI release does not yet include the bundled skill or the new kernel
+lifecycle and process-discovery commands. Nothing from this development version
+has been published to PyPI.
+
+From a local checkout:
 
 ```bash
-pipx install git+https://github.com/hruskamiro/jupyter-kernel-client.git
-pipx upgrade jupyter-kernel-cli
 pipx install --force .
 python -m pip install -e ".[dev]"
 ```
@@ -91,14 +97,81 @@ select it when a request concerns a live Jupyter, IPython, or Spyder session.
 
 ### Upgrade
 
-Upgrade the CLI, then refresh the installed skill from the new package:
+To move an existing installation to development `main`, reinstall from GitHub,
+then refresh the installed skill. The skill's `--force` replaces local edits:
 
 ```bash
-pipx upgrade jupyter-kernel-cli
+pipx install --force git+https://github.com/hruskamiro/jupyter-kernel-client.git@main
 jk skill install --force
 ```
 
+For an installation tracking PyPI releases instead, use
+`pipx upgrade jupyter-kernel-cli`; this does not switch it to GitHub `main`.
+
 ## Usage
+
+### Start and discover kernels
+
+Start a detached kernel with the Python environment installed alongside `jk`,
+or select an analysis environment explicitly:
+
+```bash
+jk kernel start --json
+jk kernel start --python /path/to/env/bin/python --cwd /path/to/project --json
+jk kernel start --connection-file /path/to/new/kernel.json --json
+```
+
+The selected Python must contain `ipykernel`. The command waits for readiness,
+then returns the PID, connection-file `path`, log path, Python executable and
+working directory. By default it creates a unique `kernel-*.json` in the standard
+Jupyter runtime directory, with a sibling `.log`. Connection and log files are
+private and existing files are never overwritten. Use `--log` and `--timeout`
+to customize the log location and startup wait. Connection secrets are never
+included in command output.
+
+The kernel has detached standard streams and runs independently of the launching
+CLI or terminal. It is not a service: machine shutdown, scheduler/job cleanup,
+or other system policy can still stop it. Startup failure terminates only the
+newly launched child, removes its new connection file, and retains its log.
+
+`jk kernels` merges runtime-directory files with recognized Python ipykernel and
+Spyder processes owned by the current user on the current machine. It also finds
+processes using custom connection paths; there is no separate `jk` registry.
+Forked workers with an ancestor using the same connection path are not additional
+kernels. Process information may be incomplete because of access restrictions.
+
+```bash
+jk kernels --json
+jk kernels --probe --json --limit 0
+```
+
+Each record has `path`, `file_exists`, discovery `sources`, process metadata,
+`running`, and `responsive`. `running: true` means a matching process was seen;
+`null` means unknown, not dead. `responsive` is only measured with `--probe`:
+`false` can mean busy or unreachable, not necessarily dead. Probe failures are
+reported in `error`. Live-process records appear first. Listing does not execute
+kernel code, and no connection file is opened unless probing is requested.
+
+### Stop a kernel
+
+```bash
+jk kernel stop -f /path/to/kernel.json --json
+```
+
+Stopping requires an explicit connection path; it never selects a kernel from
+environment defaults. It requests graceful Jupyter shutdown without executing
+user code or sending OS signals. If the local process is identifiable, it waits
+for that process to exit. Otherwise a shutdown reply is reported as
+`shutdown_acknowledged`, with `stopped: null`, not as a verified process exit.
+Multiple matching processes cause refusal before sending the request.
+
+Use `--timeout` to change the default 10-second wait. A timeout returns exit code
+124 and does not imply the request was cancelled; it may still complete. There
+is no automatic interrupt or force-kill. The command does not delete connection
+files or logs (the kernel may remove its own connection file). Stop only kernels
+you intend to shut down: their in-memory state is lost.
+
+### Work with an existing kernel
 
 Common commands:
 
@@ -188,9 +261,10 @@ attempt that cannot reach the local sockets.
 **Approving `jk` allows arbitrary code execution in the connected Jupyter
 kernel.** Treat this as execution access to that live Python session.
 
-## JSON Contract
+## Execution JSON Contract
 
-Successful JSON responses include:
+Successful execution JSON responses include the following fields. Startup,
+shutdown and discovery return the records described in their sections above.
 
 ```json
 {
@@ -214,13 +288,13 @@ Successful JSON responses include:
 Exit codes:
 
 ```text
-0    kernel execution succeeded
+0    operation succeeded (shutdown may be acknowledged without verified exit)
 1    kernel execution raised an error
 2    client or argument error
-124  client timed out waiting for the kernel or interrupt reply
+124  execution, interrupt-reply or shutdown-confirmation timeout
 ```
 
-Timeouts only stop the client wait. Timed-out execution may continue in the
+Execution timeouts only stop the client wait. Timed-out execution may continue in the
 kernel until it finishes or is interrupted. `jk interrupt` sends a Jupyter
 `interrupt_request` on the control channel; for Python kernels this is the
 normal KeyboardInterrupt-style path. It is not a process kill, so native
@@ -237,6 +311,21 @@ if response.ok:
 
 interrupt = interrupt_kernel("/path/to/kernel.json")
 print(interrupt.status)
+```
+
+For an explicitly requested temporary kernel, the same lifecycle and discovery
+operations are available as Python functions:
+
+```python
+from jupyter_kernel_client import discover_kernels, eval_expression, start_kernel, stop_kernel
+
+kernel = start_kernel()  # Optional python=, cwd=, connection_file=, log= and timeout=.
+try:
+    response = eval_expression(kernel["path"], "sum(range(101))")
+    print(response.result_python)
+    print(discover_kernels())
+finally:
+    print(stop_kernel(kernel["path"]))  # Inspect status/stopped; a timeout is not a force-kill.
 ```
 
 ## License
