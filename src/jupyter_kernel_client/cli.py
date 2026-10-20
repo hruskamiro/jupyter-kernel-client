@@ -19,6 +19,7 @@ from .client import (
     interrupt_kernel,
     kernel_is_ready,
 )
+from .skill import SkillInstallError, codex_skill_path, install_codex_skill
 
 
 def _default_connection_file() -> Optional[str]:
@@ -222,6 +223,32 @@ def _build_parser() -> argparse.ArgumentParser:
     kernels_parser.add_argument("--probe", action="store_true", help="Connect to each listed file and report whether it responds.")
     kernels_parser.add_argument("--timeout", type=float, default=1.0, help="Seconds to wait per probed kernel.")
 
+    skill_parser = subparsers.add_parser("skill", help="Manage the bundled Codex skill.")
+    skill_subparsers = skill_parser.add_subparsers(dest="skill_command", required=True)
+
+    skill_install_parser = skill_subparsers.add_parser(
+        "install",
+        help="Install the jk skill for the current Codex user.",
+    )
+    skill_install_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Replace an existing jk skill when its contents differ.",
+    )
+    skill_install_parser.add_argument(
+        "--dest",
+        help="Install to this exact skill directory instead of the user Codex directory.",
+    )
+
+    skill_path_parser = skill_subparsers.add_parser(
+        "path",
+        help="Print the user-level installation path for the jk skill.",
+    )
+    skill_path_parser.add_argument(
+        "--dest",
+        help="Print this explicit skill directory instead of the user Codex directory.",
+    )
+
     return parser
 
 
@@ -231,7 +258,7 @@ def _normalize_argv(argv: Optional[Iterable[str]]) -> Optional[List[str]]:
     else:
         values = list(argv)
 
-    commands = {"exec", "eval", "get", "vars", "demo", "interrupt", "kernels"}
+    commands = {"exec", "eval", "get", "vars", "demo", "interrupt", "kernels", "skill"}
     command_positions = [index for index, value in enumerate(values) if value in commands]
     if not command_positions:
         return values if argv is not None else None
@@ -269,6 +296,18 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     try:
         if args.command == "kernels":
             return _list_kernels(json_output=args.json, limit=args.limit, probe=args.probe, timeout=args.timeout)
+        if args.command == "skill":
+            if args.skill_command == "path":
+                print(codex_skill_path(destination=args.dest))
+                return 0
+            if args.skill_command == "install":
+                path, changed = install_codex_skill(destination=args.dest, force=args.force)
+                if changed:
+                    print(f"Installed jk Codex skill at {path}")
+                    print("The skill will be available in a new Codex turn or session.")
+                else:
+                    print(f"jk Codex skill is already up to date at {path}")
+                return 0
 
         connection_file = _resolve_connection_file(args)
         if args.command == "exec":
@@ -297,6 +336,9 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
             return _emit_interrupt_response(response, json_output=args.json)
         else:
             parser.error(f"Unknown command: {args.command}")
+    except SkillInstallError as exc:
+        print(f"Skill install error: {exc}", file=sys.stderr)
+        return 2
     except Exception as exc:
         if getattr(args, "json", False):
             print(json.dumps({"status": "client_error", "ok": False, "error": str(exc)}, ensure_ascii=True))

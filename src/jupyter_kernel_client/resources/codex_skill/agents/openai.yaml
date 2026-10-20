@@ -1,0 +1,4 @@
+interface:
+  display_name: "JK Live Jupyter Kernel"
+  short_description: "Work with state in a live Jupyter kernel"
+  default_prompt: "Use $jk to inspect and work with my live Jupyter kernel."

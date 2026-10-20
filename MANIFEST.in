@@ -1,0 +1,1 @@
+recursive-include src/jupyter_kernel_client/resources *.md *.yaml
