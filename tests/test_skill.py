@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from jupyter_kernel_client.cli import main
 from jupyter_kernel_client.skill import (
@@ -62,6 +63,25 @@ class CodexSkillInstallerTests(unittest.TestCase):
             self.assertEqual(result, 2)
             self.assertIn("Skill install error:", stderr.getvalue())
             self.assertEqual((destination / "SKILL.md").read_text(), "locally changed\n")
+
+    def test_failed_replacement_restores_existing_install(self):
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "jk"
+            install_codex_skill(destination=str(destination))
+            (destination / "SKILL.md").write_text("locally changed\n")
+            rename = Path.rename
+
+            def fail_staged_rename(path, target):
+                if path.name == "jk" and path.parent.name.startswith(".jk-skill-"):
+                    raise OSError("replacement failed")
+                return rename(path, target)
+
+            with patch.object(Path, "rename", fail_staged_rename):
+                with self.assertRaisesRegex(OSError, "replacement failed"):
+                    install_codex_skill(destination=str(destination), force=True)
+
+            self.assertEqual((destination / "SKILL.md").read_text(), "locally changed\n")
+            self.assertEqual(list(Path(directory).iterdir()), [destination])
 
 
 if __name__ == "__main__":
